@@ -31,7 +31,11 @@ type Config struct {
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
+<<<<<<< HEAD
 	// Additional argument to pass when executing Puppet.
+=======
+	// Additional arguments to pass when executing Puppet
+>>>>>>> add ExtraArguments to puppet-server and delay interpolation of extra_arguments
 	ExtraArguments []string `mapstructure:"extra_arguments"`
 
 	// Additional facts to set when executing Puppet
@@ -126,7 +130,11 @@ type ExecuteTemplate struct {
 	PuppetServer         string
 	PuppetBinDir         string
 	Sudo                 bool
+<<<<<<< HEAD
 	WorkingDir           string
+=======
+	ExtraArguments       string
+>>>>>>> add ExtraArguments to puppet-server and delay interpolation of extra_arguments
 }
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
