@@ -316,6 +316,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		return err
 	}
 
+	// Execute command
 	cmd := &packer.RemoteCmd{
 		Command: command,
 	}
