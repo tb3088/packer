@@ -15,6 +15,31 @@ DIR="$( cd -P "$( dirname "$SOURCE" )/.." && pwd )"
 # Change into that directory
 cd $DIR
 
+# Get the git commit
+GIT_COMMIT=$(git rev-parse HEAD)
+GIT_DIRTY=$(test -n "`git status --porcelain`" && echo "+CHANGES" || true)
+
+: ${GOPATH:=$(go env GOPATH)}
+[ -n "$GOPATH" ] || { echo "Error: GOPATH not set"; exit 1; }
+
+# Windows version of 'go' tools can not cope with Cygwin style paths
+case $(uname) in
+    CYGWIN*)
+	GOX="$(cygpath -u "$GOPATH")/bin/gox"
+	GOPATH=$(cygpath -w "$GOPATH")
+        ;;
+esac
+
+# If its dev mode, only build for ourself
+if [ -n "${PACKER_DEV}" ]; then
+    : ${XC_OS:=$(go env GOOS)}
+    : ${XC_ARCH:=$(go env GOARCH)}
+fi
+
+# Determine the arch/os combos we're building for
+: ${XC_ARCH:="386 amd64 arm"}
+: ${XC_OS:=linux darwin windows freebsd openbsd}
+
 # Delete the old dir
 echo "==> Removing old directory..."
 rm -f bin/*
@@ -83,13 +108,13 @@ ${GOX:?command not found} \
     -ldflags "${GOLDFLAGS}" \
     -output "pkg/{{.OS}}_{{.Arch}}/packer" \
     .
-set -e
 
 # trim GOPATH to first element
 IFS="$PATHSEP"
 MAIN_GOPATH=($GOPATH)
 MAIN_GOPATH="$(convert_path --unix "$MAIN_GOPATH")"
 IFS=$OLDIFS
+set -e
 
 # Copy our OS/Arch to the bin/ directory
 echo "==> Copying binaries for this platform..."
