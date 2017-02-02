@@ -58,10 +58,13 @@ dev: deps ## Build and install a development build
 	@cp $(GOPATH)/bin/packer pkg/$(GOOS)_$(GOARCH)
 
 fmt: ## Format Go code
-	@gofmt -w -s $(GOFMT_FILES)
+	@$(GOFMT_FILES) | xargs gofmt -w -s
 
 fmt-check: ## Check go code formatting
-	$(CURDIR)/scripts/gofmtcheck.sh $(GOFMT_FILES)
+	@echo "==> Checking that code complies with gofmt requirements..."
+	@echo "You can use the command: \`make fmt\` to reformat code."
+	@$(GOFMT_FILES) | xargs $(CURDIR)/scripts/gofmtcheck.sh
+	@echo "Check complete."
 
 fmt-docs:
 	@find ./website/source/docs -name "*.md" -exec pandoc --wrap auto --columns 79 --atx-headers -s -f "markdown_github+yaml_metadata_block" -t "markdown_github+yaml_metadata_block" {} -o {} \;
