@@ -29,8 +29,8 @@ type Config struct {
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
-	// Additional arguments to pass when executing Puppet
-	ExtraArguments []string `mapstructure:"extra_arguments"`
+	// The Guest OS Type (unix or windows)
+	GuestOSType string `mapstructure:"guest_os_type"`
 
 	// Additional facts to set when executing Puppet
 	Facter map[string]string
@@ -50,6 +50,9 @@ type Config struct {
 	// A directory of manifest files that will be uploaded to the remote
 	// machine.
 	ManifestDir string `mapstructure:"manifest_dir"`
+
+	// Additional arguments to pass when executing Puppet
+	Options []string `mapstructure:"options"`
 
 	// If true, `sudo` will NOT be used to execute Puppet.
 	PreventSudo bool `mapstructure:"prevent_sudo"`
@@ -115,6 +118,48 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 	},
 }
 
+type guestOSTypeConfig struct {
+	tempDir          string
+	stagingDir       string
+	executeCommand   string
+	facterVarsFmt    string
+	facterVarsJoiner string
+}
+
+var guestOSTypeConfigs = map[string]guestOSTypeConfig{
+	provisioner.UnixOSType: {
+	tempDir: "/tmp",
+	stagingDir: "/tmp/packer-puppet-masterless",
+	executeCommand: "cd {{.WorkingDir}} && " +
+		"{{.FacterVars}}" +
+		"{{if .Sudo}}sudo -E {{end}}" +
+		`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
+		"puppet apply --detailed-exitcodes {{.Options}} " +
+		"{{if .Debug}}--debug {{end}}" +
+		`{{if ne .ModulePath ""}}--modulepath='{{.ModulePath}}'  {{end}}` +
+		`{{if ne .HieraConfigPath ""}}--hiera_config='{{.HieraConfigPath}}' {{end}}` +
+		`{{if ne .ManifestDir ""}}--manifestdir='{{.ManifestDir}}' {{end}}` +
+		"{{.ManifestFile}}",
+		facterVarsFmt:    "FACTER_%s='%s'",
+		facterVarsJoiner: " ",
+	},
+	provisioner.WindowsOSType: {
+		tempDir: path.filepath.ToSlash(os.Getenv("TEMP")),
+		stagingDir: path.filepath.ToSlash(os.Getenv("SYSTEMROOT")) + "/Temp/packer-puppet-masterless",
+		executeCommand: "cd {{.WorkingDir}} && " +
+		"{{.FacterVars}} && " +
+		`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
+		"puppet apply --detailed-exitcodes {{.Options}} " +
+		"{{if .Debug}}--debug {{end}}" +
+		`{{if ne .ModulePath ""}}--modulepath='{{.ModulePath}}'  {{end}}` +
+		`{{if ne .HieraConfigPath ""}}--hiera_config='{{.HieraConfigPath}}' {{end}}` +
+		`{{if ne .ManifestDir ""}}--manifestdir='{{.ManifestDir}}' {{end}}` +
+		"{{.ManifestFile}}",
+		facterVarsFmt:    `SET "FACTER_%s=%s"`,
+		facterVarsJoiner: " & ",
+	},
+}
+
 type Provisioner struct {
 	config            Config
 	guestOSTypeConfig guestOSTypeConfig
@@ -142,7 +187,7 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		InterpolateFilter: &interpolate.RenderFilter{
 			Exclude: []string{
 				"execute_command",
-				"extra_arguments",
+				"options",
 			},
 		},
 	}, raws...)
@@ -305,11 +350,11 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	p.config.ctx.Data = &data
-	_ExtraArguments, err := interpolate.Render(strings.Join(p.config.ExtraArguments, " "), &p.config.ctx)
+	_Options, err := interpolate.Render(strings.Join(p.config.Options, " "), &p.config.ctx)
 	if err != nil {
 		return err
 	}
-	data.ExtraArguments = _ExtraArguments
+	data.Options = _Options
 
 	command, err := interpolate.Render(p.config.ExecuteCommand, &p.config.ctx)
 	if err != nil {

@@ -31,8 +31,8 @@ type Config struct {
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
-	// Additional arguments to pass when executing Puppet
-	ExtraArguments []string `mapstructure:"extra_arguments"`
+	// The Guest OS Type (unix or windows)
+	GuestOSType string `mapstructure:"guest_os_type"`
 
 	// Additional facts to set when executing Puppet
 	Facter map[string]string
@@ -56,14 +56,26 @@ type Config struct {
 	// The hostname of the Puppet server.
 	PuppetServer string `mapstructure:"puppet_server"`
 
+	// Additional argument to pass when executing Puppet.
+	Options string `mapstructure:"options"`
+
+	// If true, `sudo` will NOT be used to execute Puppet.
+	PreventSudo bool `mapstructure:"prevent_sudo"`
+
 	// The directory where files will be uploaded. Packer requires write
 	// permissions in this directory.
 	StagingDir string `mapstructure:"staging_dir"`
 
+	// If true, staging directory is removed after executing puppet.
+	CleanStagingDir bool `mapstructure:"clean_staging_directory"`
+
 	// The directory from which the command will be executed.
 	// Packer requires the directory to exist when running puppet.
 	WorkingDir string `mapstructure:"working_directory"`
-}
+
+	// The directory that contains the puppet binary.
+	// E.g. if it can't be found on the standard path.
+	PuppetBinDir string `mapstructure:"puppet_bin_dir"`
 
 type guestOSTypeConfig struct {
 	executeCommand   string
@@ -110,6 +122,48 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 	},
 }
 
+type guestOSTypeConfig struct {
+	tempDir          string
+	stagingDir       string
+	executeCommand   string
+	facterVarsFmt    string
+	facterVarsJoiner string
+}
+
+var guestOSTypeConfigs = map[string]guestOSTypeConfig{
+	provisioner.UnixOSType: {
+		tempDir: "/tmp",
+		stagingDir: "/tmp/packer-puppet-server",
+		executeCommand: "cd {{.WorkingDir}} && " +
+			"{{.FacterVars}}" +
+			"{{if .Sudo}}sudo -E {{end}}" +
+			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
+			"puppet agent --onetime --no-daemonize --detailed-exitcodes {{.Options}} " +
+			"{{if .Debug}}--debug {{end}}" +
+			`{{if ne .PuppetServer ""}}--server='{{.PuppetServer}}' {{end}}` +
+			`{{if ne .PuppetNode ""}}--certname={{.PuppetNode}} {{end}}` +
+			`{{if ne .ClientCertPath ""}}--certdir='{{.ClientCertPath}}' {{end}}` +
+			`{{if ne .ClientPrivateKeyPath ""}}--privatekeydir='{{.ClientPrivateKeyPath}}' {{end}}`,
+		facterVarsFmt:    "FACTER_%s='%s'",
+		facterVarsJoiner: " ",
+	},
+	provisioner.WindowsOSType: {
+		tempDir: path.filepath.ToSlash(os.Getenv("TEMP")),
+		stagingDir: path.filepath.ToSlash(os.Getenv("SYSTEMROOT")) + "/Temp/packer-puppet-server",
+		executeCommand: "cd {{.WorkingDir}} && " +
+			"{{.FacterVars}} " +
+			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
+			"puppet agent --onetime --no-daemonize --detailed-exitcodes {{.Options}} " +
+			"{{if .Debug}}--debug {{end}}" +
+			`{{if ne .PuppetServer ""}}--server='{{.PuppetServer}}' {{end}}` +
+			`{{if ne .PuppetNode ""}}--certname={{.PuppetNode}} {{end}}` +
+			`{{if ne .ClientCertPath ""}}--certdir='{{.ClientCertPath}}' {{end}}` +
+			`{{if ne .ClientPrivateKeyPath ""}}--privatekeydir='{{.ClientPrivateKeyPath}}' {{end}}`,
+		facterVarsFmt:    `SET "FACTER_%s=%s"`,
+		facterVarsJoiner: " & ",
+	},
+}
+
 type Provisioner struct {
 	config            Config
 	guestOSTypeConfig guestOSTypeConfig
@@ -127,6 +181,7 @@ type ExecuteTemplate struct {
 	PuppetBinDir         string
 	Sudo                 bool
 	WorkingDir           string
+	Debug                bool
 }
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
@@ -136,7 +191,7 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		InterpolateFilter: &interpolate.RenderFilter{
 			Exclude: []string{
 				"execute_command",
-				"extra_arguments",
+				"options",
 			},
 		},
 	}, raws...)
@@ -144,6 +199,7 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		return err
 	}
 
+	// Set some defaults
 	if p.config.GuestOSType == "" {
 		p.config.GuestOSType = provisioner.DefaultOSType
 	}
@@ -245,7 +301,8 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		facterVars = append(facterVars, fmt.Sprintf(p.guestOSTypeConfig.facterVarsFmt, k, v))
 	}
 
-	data := ExecuteTemplate{
+	// Execute Puppet
+	p.config.ctx.Data = &ExecuteTemplate{
 		ClientCertPath:       remoteClientCertPath,
 		ClientPrivateKeyPath: remoteClientPrivateKeyPath,
 		ExtraArguments:       "",
@@ -258,11 +315,11 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	p.config.ctx.Data = &data
-	_ExtraArguments, err := interpolate.Render(strings.Join(p.config.ExtraArguments, " "), &p.config.ctx)
+	_Options, err := interpolate.Render(strings.Join(p.config.Options, " "), &p.config.ctx)
 	if err != nil {
 		return err
 	}
-	data.ExtraArguments = _ExtraArguments
+	data.Options = _Options
 
 	command, err := interpolate.Render(p.config.ExecuteCommand, &p.config.ctx)
 	if err != nil {
@@ -276,7 +333,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 
 	ui.Message(fmt.Sprintf("Running Puppet: %s", command))
 	if err := cmd.StartWithUi(comm, ui); err != nil {
-		return err
+		return fmt.Errorf("Got an error starting command: %s", err)
 	}
 
 	if cmd.ExitStatus != 0 && cmd.ExitStatus != 2 && !p.config.IgnoreExitCodes {
@@ -326,12 +383,21 @@ func (p *Provisioner) removeDir(ui packer.Ui, comm packer.Communicator, dir stri
 		Command: fmt.Sprintf("rm -fr '%s'", dir),
 	}
 
+	cmd := &packer.RemoteCmd{Command: p.guestCommands.CreateDir(dir)}
 	if err := cmd.StartWithUi(comm, ui); err != nil {
 		return err
 	}
-
 	if cmd.ExitStatus != 0 {
-		return fmt.Errorf("Non-zero exit status.")
+		return fmt.Errorf("Non-zero exit status. See output above for more info.")
+	}
+
+	// Chmod the directory to 0777 just so that we can access it as our user
+	cmd = &packer.RemoteCmd{Command: p.guestCommands.Chmod(dir, "0777")}
+	if err := cmd.StartWithUi(comm, ui); err != nil {
+		return err
+	}
+	if cmd.ExitStatus != 0 {
+		return fmt.Errorf("Non-zero exit status. See output above for more info.")
 	}
 
 	return nil
