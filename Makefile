@@ -9,7 +9,7 @@ GOARCH=$(shell go env GOARCH)
 GOPATH=$(shell go env GOPATH)
 
 # gofmt
-UNFORMATTED_FILES=$(shell find . -not -path "./vendor/*" -name "*.go" | xargs gofmt -s -l)
+GOFMT_FILES?=find . -not -path './vendor/*' -name '*.go'
 
 # Get the git commit
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
@@ -62,11 +62,13 @@ dev: deps ## Build and install a development build
 fmt: ## Format Go code
 	@$(GOFMT_FILES) | xargs gofmt -w -s
 
+fmt-check: UNFORMATTED_FILES=$(shell $(GOFMT_FILES) | xargs gofmt -s -l)
 fmt-check: ## Check go code formatting
-	@echo "==> Checking that code complies with gofmt requirements..."
-	@echo "You can use the command: \`make fmt\` to reformat code."
-	@$(GOFMT_FILES) | xargs $(CURDIR)/scripts/gofmtcheck.sh
-	@echo "Check complete."
+	@echo -n "==> Checking that code complies with gofmt requirements... "
+	@[ -z "$(UNFORMATTED_FILES)" ] && echo "passed" || \
+		echo -e "failed\nRun \`make fmt\` to reformat the following files:"
+	@$(foreach item, $(UNFORMATTED_FILES), echo $(item); )
+	@[ -z "$(UNFORMATTED_FILES)" ] || exit 1
 
 fmt-docs:
 	@find ./website/source/docs -name "*.md" -exec pandoc --wrap auto --columns 79 --atx-headers -s -f "markdown_github+yaml_metadata_block" -t "markdown_github+yaml_metadata_block" {} -o {} \;
