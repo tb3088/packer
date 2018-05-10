@@ -81,6 +81,7 @@ func TestGuestOSConfig_full_unix(t *testing.T) {
 	modulePaths := []string{"/m/p", "/a/b"}
 	// Execute Puppet
 	p.config.ctx.Data = &ExecuteTemplate{
+		ExtraArguments:  strings.Join(p.config.ExtraArguments, " "),
 		FacterVars:      strings.Join(facterVars, p.guestOSTypeConfig.facterVarsJoiner),
 		HieraConfigPath: "/h/c/p",
 		ManifestDir:     "/r/m/d",
@@ -89,7 +90,6 @@ func TestGuestOSConfig_full_unix(t *testing.T) {
 		PuppetBinDir:    p.config.PuppetBinDir,
 		Sudo:            !p.config.PreventSudo,
 		WorkingDir:      p.config.WorkingDir,
-		Options:         strings.Join(p.config.Options, " "),
 	}
 	command, err := interpolate.Render(p.config.ExecuteCommand, &p.config.ctx)
 	if err != nil {
@@ -150,6 +150,7 @@ func TestGuestOSConfig_full_windows(t *testing.T) {
 	modulePaths := []string{"/m/p", "/a/b"}
 	// Execute Puppet
 	p.config.ctx.Data = &ExecuteTemplate{
+		ExtraArguments:  strings.Join(p.config.ExtraArguments, " "),
 		FacterVars:      strings.Join(facterVars, p.guestOSTypeConfig.facterVarsJoiner),
 		HieraConfigPath: "/h/c/p",
 		ManifestDir:     "/r/m/d",
@@ -158,7 +159,6 @@ func TestGuestOSConfig_full_windows(t *testing.T) {
 		PuppetBinDir:    p.config.PuppetBinDir,
 		Sudo:            !p.config.PreventSudo,
 		WorkingDir:      p.config.WorkingDir,
-		Options:         strings.Join(p.config.Options, " "),
 	}
 	command, err := interpolate.Render(p.config.ExecuteCommand, &p.config.ctx)
 	if err != nil {
@@ -378,7 +378,7 @@ func TestProvisionerPrepare_extraArguments(t *testing.T) {
 	defer tempfile.Close()
 
 	// Test with missing parameter
-	delete(config, "options")
+	delete(config, "extra_arguments")
 	p := new(Provisioner)
 	err := p.Prepare(config)
 	if err != nil {
@@ -386,7 +386,7 @@ func TestProvisionerPrepare_extraArguments(t *testing.T) {
 	}
 
 	// Test with malformed value
-	config["options"] = "{{}}"
+	config["extra_arguments"] = "{{}}"
 	p = new(Provisioner)
 	err = p.Prepare(config)
 	if err == nil {
@@ -394,7 +394,7 @@ func TestProvisionerPrepare_extraArguments(t *testing.T) {
 	}
 
 	// Test with valid values
-	config["options"] = []string{
+	config["extra_arguments"] = []string{
 		"arg",
 	}
 
@@ -480,11 +480,11 @@ func TestProvisionerProvision_extraArguments(t *testing.T) {
 	}
 	comm := new(packer.MockCommunicator)
 
-	options := []string{
+	extraArguments := []string{
 		"--some-arg=yup",
 		"--some-other-arg",
 	}
-	config["options"] = options
+	config["extra_arguments"] = extraArguments
 
 	// Test with valid values
 	p := new(Provisioner)
@@ -498,14 +498,14 @@ func TestProvisionerProvision_extraArguments(t *testing.T) {
 		t.Fatalf("err: %s", err)
 	}
 
-	expectedArgs := strings.Join(options, " ")
+	expectedArgs := strings.Join(extraArguments, " ")
 
 	if !strings.Contains(comm.StartCmd.Command, expectedArgs) {
 		t.Fatalf("Command %q doesn't contain the expected arguments %q", comm.StartCmd.Command, expectedArgs)
 	}
 
 	// Test with missing parameter
-	delete(config, "options")
+	delete(config, "extra_arguments")
 
 	p = new(Provisioner)
 	err = p.Prepare(config)
@@ -518,7 +518,7 @@ func TestProvisionerProvision_extraArguments(t *testing.T) {
 		t.Fatalf("err: %s", err)
 	}
 
-	// Check the expected `options` position for an empty value
+	// Check the expected `extra_arguments` position for an empty value
 	splitCommand := strings.Split(comm.StartCmd.Command, " ")
 	if "" == splitCommand[len(splitCommand)-2] {
 		t.Fatalf("Command %q contains an extra-space which may cause arg parsing issues", comm.StartCmd.Command)

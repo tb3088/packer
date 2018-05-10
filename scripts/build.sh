@@ -108,14 +108,13 @@ ${GOX:?command not found} \
     -ldflags "${GOLDFLAGS}" \
     -output "pkg/{{.OS}}_{{.Arch}}/packer" \
     .
-
 set -e
+
 # trim GOPATH to first element
 IFS="$PATHSEP"
 MAIN_GOPATH=($GOPATH)
 MAIN_GOPATH="$(convert_path --unix "$MAIN_GOPATH")"
 IFS=$OLDIFS
-set -e
 
 # Copy our OS/Arch to the bin/ directory
 echo "==> Copying binaries for this platform..."

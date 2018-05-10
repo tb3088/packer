@@ -23,9 +23,6 @@ type Config struct {
 	// If true, staging directory is removed after executing puppet.
 	CleanStagingDir bool `mapstructure:"clean_staging_directory"`
 
-	// The Guest OS Type (unix or windows)
-	GuestOSType string `mapstructure:"guest_os_type"`
-
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
@@ -85,7 +82,7 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 		tempDir:    "/tmp",
 		stagingDir: "/tmp/packer-puppet-masterless",
 		executeCommand: "cd {{.WorkingDir}} && " +
-			"{{.FacterVars}}" +
+			`{{if ne .FacterVars ""}}{{.FacterVars}} {{end}}` +
 			"{{if .Sudo}}sudo -E {{end}}" +
 			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
 			"puppet apply --detailed-exitcodes " +
@@ -97,6 +94,7 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 			"{{.ManifestFile}}",
 		facterVarsFmt:    "FACTER_%s='%s'",
 		facterVarsJoiner: " ",
+		modulePathJoiner: ":",
 	},
 	provisioner.WindowsOSType: {
 		tempDir:    filepath.ToSlash(os.Getenv("TEMP")),
@@ -113,6 +111,7 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 			"{{.ManifestFile}}",
 		facterVarsFmt:    `SET "FACTER_%s=%s"`,
 		facterVarsJoiner: " & ",
+		modulePathJoiner: ";",
 	},
 }
 

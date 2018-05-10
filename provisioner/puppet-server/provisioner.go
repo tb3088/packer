@@ -31,8 +31,8 @@ type Config struct {
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
-	// The Guest OS Type (unix or windows)
-	GuestOSType string `mapstructure:"guest_os_type"`
+	// Additional argument to pass when executing Puppet.
+	ExtraArguments []string `mapstructure:"extra_arguments"`
 
 	// Additional facts to set when executing Puppet
 	Facter map[string]string
@@ -56,26 +56,14 @@ type Config struct {
 	// The hostname of the Puppet server.
 	PuppetServer string `mapstructure:"puppet_server"`
 
-	// Additional argument to pass when executing Puppet.
-	ExtraArguments []string `mapstructure:"extra_arguments"`
-
-	// If true, `sudo` will NOT be used to execute Puppet.
-	PreventSudo bool `mapstructure:"prevent_sudo"`
-
 	// The directory where files will be uploaded. Packer requires write
 	// permissions in this directory.
 	StagingDir string `mapstructure:"staging_dir"`
 
-	// If true, staging directory is removed after executing puppet.
-	CleanStagingDir bool `mapstructure:"clean_staging_directory"`
-
 	// The directory from which the command will be executed.
 	// Packer requires the directory to exist when running puppet.
 	WorkingDir string `mapstructure:"working_directory"`
-
-	// The directory that contains the puppet binary.
-	// E.g. if it can't be found on the standard path.
-	PuppetBinDir string `mapstructure:"puppet_bin_dir"`
+}
 
 type guestOSTypeConfig struct {
 	executeCommand   string
@@ -374,4 +362,3 @@ func (p *Provisioner) uploadDirectory(ui packer.Ui, comm packer.Communicator, ds
 
 	return comm.UploadDir(dst, src, nil)
 }
-
