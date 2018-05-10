@@ -85,7 +85,7 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 		tempDir:    "/tmp",
 		stagingDir: "/tmp/packer-puppet-masterless",
 		executeCommand: "cd {{.WorkingDir}} && " +
-			`{{if ne .FacterVars ""}}{{.FacterVars}} {{end}}` +
+			"{{.FacterVars}}" +
 			"{{if .Sudo}}sudo -E {{end}}" +
 			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
 			"puppet apply --detailed-exitcodes " +
@@ -97,7 +97,6 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 			"{{.ManifestFile}}",
 		facterVarsFmt:    "FACTER_%s='%s'",
 		facterVarsJoiner: " ",
-		modulePathJoiner: ":",
 	},
 	provisioner.WindowsOSType: {
 		tempDir:    filepath.ToSlash(os.Getenv("TEMP")),
@@ -114,7 +113,6 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 			"{{.ManifestFile}}",
 		facterVarsFmt:    `SET "FACTER_%s=%s"`,
 		facterVarsJoiner: " & ",
-		modulePathJoiner: ";",
 	},
 }
 

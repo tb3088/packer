@@ -416,3 +416,4 @@ func (p *Provisioner) uploadDirectory(ui packer.Ui, comm packer.Communicator, ds
 
 	return comm.UploadDir(dst, src, nil)
 }
+

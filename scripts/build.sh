@@ -109,6 +109,7 @@ ${GOX:?command not found} \
     -output "pkg/{{.OS}}_{{.Arch}}/packer" \
     .
 
+set -e
 # trim GOPATH to first element
 IFS="$PATHSEP"
 MAIN_GOPATH=($GOPATH)
