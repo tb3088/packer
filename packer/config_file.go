@@ -22,17 +22,22 @@ func ConfigDir() (string, error) {
 func ConfigTmpDir() (string, error) {
 	var tmpdir, td string
 	var found bool
+	tmpdirenv := []string{"TEMP", "TMP", "LOCALAPPDATA"}
 
 	if tmpdir = os.Getenv("PACKER_TMP_DIR"); tmpdir == "" {
-		for e := range []string{"TEMP", "TMP", "LOCALAPPDATA"} {
-			if tmpdir, found := os.LookupEnv(e); found {
+		for e := range tmpdirenv {
+			if tmpdir, found := os.LookupEnv(tmpdirenv[e]); found {
 				td = filepath.Join(tmpdir, "packer")
 				break
 			}
 		}
 	}
 	if tmpdir == "" {
-		td = filepath.Join(configDir(), "tmp")
+		configdir, err := configDir()
+		if err != nil {
+			return "", err
+		}
+		td = filepath.Join(configdir, "tmp")
 	}
 
 	_, err = os.Stat(td)
