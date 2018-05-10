@@ -20,11 +20,14 @@ type Config struct {
 	common.PackerConfig `mapstructure:",squash"`
 	ctx                 interpolate.Context
 
-	// The command used to execute Puppet.
-	ExecuteCommand string `mapstructure:"execute_command"`
+	// If true, staging directory is removed after executing puppet.
+	CleanStagingDir bool `mapstructure:"clean_staging_directory"`
 
 	// The Guest OS Type (unix or windows)
 	GuestOSType string `mapstructure:"guest_os_type"`
+
+	// The command used to execute Puppet.
+	ExecuteCommand string `mapstructure:"execute_command"`
 
 	// The Guest OS Type (unix or windows)
 	GuestOSType string `mapstructure:"guest_os_type"`
@@ -34,6 +37,9 @@ type Config struct {
 
 	// Path to a hiera configuration file to upload and use.
 	HieraConfigPath string `mapstructure:"hiera_config_path"`
+
+	// If true, packer will ignore all exit-codes from a puppet run
+	IgnoreExitCodes bool `mapstructure:"ignore_exit_codes"`
 
 	// An array of local paths of modules to upload.
 	ModulePaths []string `mapstructure:"module_paths"`
@@ -51,31 +57,26 @@ type Config struct {
 	// If true, `sudo` will NOT be used to execute Puppet.
 	PreventSudo bool `mapstructure:"prevent_sudo"`
 
-	// The directory where files will be uploaded. Packer requires write
-	// permissions in this directory.
-	StagingDir string `mapstructure:"staging_directory"`
-
-	// If true, staging directory is removed after executing puppet.
-	CleanStagingDir bool `mapstructure:"clean_staging_directory"`
-
-	// The directory from which the command will be executed.
-	// Packer requires the directory to exist when running puppet.
-	WorkingDir string `mapstructure:"working_directory"`
-
 	// The directory that contains the puppet binary.
 	// E.g. if it can't be found on the standard path.
 	PuppetBinDir string `mapstructure:"puppet_bin_dir"`
 
-	// If true, packer will ignore all exit-codes from a puppet run
-	IgnoreExitCodes bool `mapstructure:"ignore_exit_codes"`
+	// The directory where files will be uploaded. Packer requires write
+	// permissions in this directory.
+	StagingDir string `mapstructure:"staging_directory"`
+
+	// The directory from which the command will be executed.
+	// Packer requires the directory to exist when running puppet.
+	WorkingDir string `mapstructure:"working_directory"`
 }
 
 type guestOSTypeConfig struct {
-	tempDir          string
-	stagingDir       string
 	executeCommand   string
 	facterVarsFmt    string
 	facterVarsJoiner string
+	modulePathJoiner string
+	stagingDir       string
+	tempDir          string
 }
 
 // FIXME assumes both Packer host and target are same OS
@@ -122,17 +123,17 @@ type Provisioner struct {
 }
 
 type ExecuteTemplate struct {
-	FacterVars      string
-	HieraConfigPath string
-	ModulePath      string
-	ManifestFile    string
-	ManifestDir     string
-	Options         string
-	PuppetBinDir    string
-	Sudo            bool
-	WorkingDir      string
-	Debug           bool
-	ExtraArguments  string
+	Debug            bool
+	ExtraArguments   string
+	FacterVars       string
+	HieraConfigPath  string
+	ModulePath       string
+	ModulePathJoiner string
+	ManifestFile     string
+	ManifestDir      string
+	PuppetBinDir     string
+	Sudo             bool
+	WorkingDir       string
 }
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
@@ -292,15 +293,16 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	data := ExecuteTemplate{
-		FacterVars:      strings.Join(facterVars, p.guestOSTypeConfig.facterVarsJoiner),
-		HieraConfigPath: remoteHieraConfigPath,
-		ManifestDir:     remoteManifestDir,
-		ManifestFile:    remoteManifestFile,
-		ModulePath:      strings.Join(modulePaths, os.PathListSeparator),
-		PuppetBinDir:    p.config.PuppetBinDir,
-		Sudo:            !p.config.PreventSudo,
-		WorkingDir:      p.config.WorkingDir,
-		ExtraArguments:  "",
+		ExtraArguments:   "",
+		FacterVars:       strings.Join(facterVars, p.guestOSTypeConfig.facterVarsJoiner),
+		HieraConfigPath:  remoteHieraConfigPath,
+		ManifestDir:      remoteManifestDir,
+		ManifestFile:     remoteManifestFile,
+		ModulePath:       strings.Join(modulePaths, p.guestOSTypeConfig.modulePathJoiner),
+		ModulePathJoiner: p.guestOSTypeConfig.modulePathJoiner,
+		PuppetBinDir:     p.config.PuppetBinDir,
+		Sudo:             !p.config.PreventSudo,
+		WorkingDir:       p.config.WorkingDir,
 	}
 
 	p.config.ctx.Data = &data
