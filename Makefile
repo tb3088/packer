@@ -4,10 +4,13 @@ VET?=$(shell ls -d */ | grep -v vendor | grep -v website)
 GITSHA:=$(shell git rev-parse HEAD)
 # Get the current local branch name from git (if we can, this may be blank)
 GITBRANCH:=$(shell git symbolic-ref --short HEAD 2>/dev/null)
-GOFMT_FILES?=$$(find . -not -path "./vendor/*" -name "*.go")
 GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 GOPATH=$(shell go env GOPATH)
+
+GOFMT_FILES ?= $(shell find . -not -path './vendor/*' -name '*.go')
+GOFMT_START=1
+GOFMT_CHUNK=100
 
 # Get the git commit
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
@@ -24,16 +27,16 @@ ci: deps test
 release: deps test releasebin package ## Build a release build
 
 bin: deps ## Build debug/test build
-	@go get github.com/mitchellh/gox
 	@echo "WARN: 'make bin' is for debug / test builds only. Use 'make release' for release builds."
+	@go get github.com/mitchellh/gox
 	@sh -c "$(CURDIR)/scripts/build.sh"
 
 releasebin: deps
-	@go get github.com/mitchellh/gox
 	@grep 'const VersionPrerelease = "dev"' version/version.go > /dev/null ; if [ $$? -eq 0 ]; then \
 		echo "ERROR: You must remove prerelease tags from version/version.go prior to release."; \
 		exit 1; \
 	fi
+	@go get github.com/mitchellh/gox
 	@sh -c "$(CURDIR)/scripts/build.sh"
 
 package:
@@ -57,11 +60,36 @@ dev: deps ## Build and install a development build
 	@cp $(GOPATH)/bin/packer bin/packer
 	@cp $(GOPATH)/bin/packer pkg/$(GOOS)_$(GOARCH)
 
+.PHONY: fmt
+.ONESHELL:
 fmt: ## Format Go code
-	@gofmt -w -s $(GOFMT_FILES)
+	@$(eval _files := $(wordlist $(GOFMT_START), $(shell expr $(GOFMT_START) + $(GOFMT_CHUNK)), $(GOFMT_FILES)))
+	if [ -n "$(_files)" ]; then
+		gofmt -w -s $(_files)
+		$(MAKE)  --no-print-directory -s GOFMT_START=$(shell expr $(GOFMT_START) + 100) $@
+	fi
 
+.PHONY: fmt-check
+.ONESHELL:
 fmt-check: ## Check go code formatting
-	$(CURDIR)/scripts/gofmtcheck.sh $(GOFMT_FILES)
+	@echo -n "==> Checking that code complies with gofmt requirements ... "
+	$(eval UNFORMATTED_FILES := $(shell $(MAKE) --no-print-directory -s fmt-check-loop))
+	@if [ $(words $(UNFORMATTED_FILES)) -eq 0 ]; then
+		echo "passed"
+	else
+		echo -e "failed\nRun \`make fmt\` to reformat the following files:"
+		$(foreach item, $(UNFORMATTED_FILES), echo '  '$(item);)
+		exit 1
+	fi
+
+.PHONY: fmt-check-loop
+.ONESHELL:
+fmt-check-loop:
+	$(eval _files := $(wordlist $(GOFMT_START), $(shell expr $(GOFMT_START) + $(GOFMT_CHUNK)), $(GOFMT_FILES)))
+	@if [ -n "$(_files)" ]; then
+		gofmt -l -s $(_files)
+		$(MAKE) GOFMT_START=$(shell expr $(GOFMT_START) + 100) $@
+	fi
 
 fmt-docs:
 	@find ./website/source/docs -name "*.md" -exec pandoc --wrap auto --columns 79 --atx-headers -s -f "markdown_github+yaml_metadata_block" -t "markdown_github+yaml_metadata_block" {} -o {} \;
