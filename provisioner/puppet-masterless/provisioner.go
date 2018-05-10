@@ -26,20 +26,20 @@ type Config struct {
 	// The command used to execute Puppet.
 	ExecuteCommand string `mapstructure:"execute_command"`
 
-	// The Guest OS Type (unix or windows)
-	GuestOSType string `mapstructure:"guest_os_type"`
+	// Additional arguments to pass when executing Puppet
+	ExtraArguments []string `mapstructure:"extra_arguments"`
 
 	// Additional facts to set when executing Puppet
 	Facter map[string]string
+
+	// The Guest OS Type (unix or windows)
+	GuestOSType string `mapstructure:"guest_os_type"`
 
 	// Path to a hiera configuration file to upload and use.
 	HieraConfigPath string `mapstructure:"hiera_config_path"`
 
 	// If true, packer will ignore all exit-codes from a puppet run
 	IgnoreExitCodes bool `mapstructure:"ignore_exit_codes"`
-
-	// An array of local paths of modules to upload.
-	ModulePaths []string `mapstructure:"module_paths"`
 
 	// The main manifest file to apply to kick off the entire thing.
 	ManifestFile string `mapstructure:"manifest_file"`
@@ -48,8 +48,8 @@ type Config struct {
 	// machine.
 	ManifestDir string `mapstructure:"manifest_dir"`
 
-	// Additional arguments to pass when executing Puppet
-	ExtraArguments []string `mapstructure:"extra_arguments"`
+	// An array of local paths of modules to upload.
+	ModulePaths []string `mapstructure:"module_paths"`
 
 	// If true, `sudo` will NOT be used to execute Puppet.
 	PreventSudo bool `mapstructure:"prevent_sudo"`
