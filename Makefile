@@ -8,7 +8,9 @@ GOOS=$(shell go env GOOS)
 GOARCH=$(shell go env GOARCH)
 GOPATH=$(shell go env GOPATH)
 
-GOFMT_FILES=$(shell find . -not -path './vendor/*' -name '*.go')
+GOFMT_FILES ?= $(shell find . -not -path './vendor/*' -name '*.go')
+GOFMT_START=1
+GOFMT_CHUNK=100
 
 # Get the git commit
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
@@ -25,16 +27,16 @@ ci: deps test
 release: deps test releasebin package ## Build a release build
 
 bin: deps ## Build debug/test build
-	@go get github.com/mitchellh/gox
 	@echo "WARN: 'make bin' is for debug / test builds only. Use 'make release' for release builds."
+	@go get github.com/mitchellh/gox
 	@sh -c "$(CURDIR)/scripts/build.sh"
 
 releasebin: deps
-	@go get github.com/mitchellh/gox
 	@grep 'const VersionPrerelease = "dev"' version/version.go > /dev/null ; if [ $$? -eq 0 ]; then \
 		echo "ERROR: You must remove prerelease tags from version/version.go prior to release."; \
 		exit 1; \
 	fi
+	@go get github.com/mitchellh/gox
 	@sh -c "$(CURDIR)/scripts/build.sh"
 
 package:
@@ -61,18 +63,26 @@ dev: deps ## Build and install a development build
 fmt: ## Format Go code
 	$(foreach item, $(GOFMT_FILES), $(shell gofmt -w -s $(item)); )
 
-#UNFORMATTED_FILES:=
-
+.ONESHELL:
 fmt-check: ## Check go code formatting
-	@echo -n "==> Checking that code complies with gofmt requirements... "
-
-# works but very slow
-	$(eval UNFORMATTED_FILES := $(foreach item, $(GOFMT_FILES), $(shell gofmt -l -s $(item))))
-	$(eval UNFORMATTED_COUNT := $(words $(UNFORMATTED_FILES)))
-	@[ $(UNFORMATTED_COUNT) -eq 0 ] && echo "passed" || \
+	@echo -n "==> Checking that code complies with gofmt requirements ... "
+	$(eval UNFORMATTED_FILES := $(shell $(MAKE) --no-print-directory -s fmt-check-loop))
+	@if [ $(words $(UNFORMATTED_FILES)) -eq 0 ]; then
+		echo "passed"
+	else
 		echo -e "failed\nRun \`make fmt\` to reformat the following files:"
-	@$(foreach item, $(UNFORMATTED_FILES), echo '  '$(item);)
-	@[ $(UNFORMATTED_COUNT) -eq 0 ] || exit 1
+		$(foreach item, $(UNFORMATTED_FILES), echo '  '$(item);)
+		exit 1
+	fi
+
+.PHONY: fmt-check-loop
+.ONESHELL:
+fmt-check-loop:
+	$(eval _files := $(wordlist $(GOFMT_START), $(shell expr $(GOFMT_START) + $(GOFMT_CHUNK)), $(GOFMT_FILES)))
+	@if [ -n "$(_files)" ]; then
+		gofmt -l -s $(_files)
+		$(MAKE) GOFMT_START=$(shell expr $(GOFMT_START) + 100) $@
+	fi
 
 fmt-docs:
 	@find ./website/source/docs -name "*.md" -exec pandoc --wrap auto --columns 79 --atx-headers -s -f "markdown_github+yaml_metadata_block" -t "markdown_github+yaml_metadata_block" {} -o {} \;
