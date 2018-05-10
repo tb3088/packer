@@ -60,9 +60,16 @@ dev: deps ## Build and install a development build
 	@cp $(GOPATH)/bin/packer bin/packer
 	@cp $(GOPATH)/bin/packer pkg/$(GOOS)_$(GOARCH)
 
+.PHONY: fmt
+.ONESHELL:
 fmt: ## Format Go code
-	$(foreach item, $(GOFMT_FILES), $(shell gofmt -w -s $(item)); )
+	@$(eval _files := $(wordlist $(GOFMT_START), $(shell expr $(GOFMT_START) + $(GOFMT_CHUNK)), $(GOFMT_FILES)))
+	if [ -n "$(_files)" ]; then
+		gofmt -w -s $(_files)
+		$(MAKE)  --no-print-directory -s GOFMT_START=$(shell expr $(GOFMT_START) + 100) $@
+	fi
 
+.PHONY: fmt-check
 .ONESHELL:
 fmt-check: ## Check go code formatting
 	@echo -n "==> Checking that code complies with gofmt requirements ... "
