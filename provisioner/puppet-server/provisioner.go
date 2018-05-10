@@ -57,7 +57,7 @@ type Config struct {
 	PuppetServer string `mapstructure:"puppet_server"`
 
 	// Additional argument to pass when executing Puppet.
-	Options string `mapstructure:"options"`
+	ExtraArguments []string `mapstructure:"extra_arguments"`
 
 	// If true, `sudo` will NOT be used to execute Puppet.
 	PreventSudo bool `mapstructure:"prevent_sudo"`
@@ -122,48 +122,6 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 	},
 }
 
-type guestOSTypeConfig struct {
-	tempDir          string
-	stagingDir       string
-	executeCommand   string
-	facterVarsFmt    string
-	facterVarsJoiner string
-}
-
-var guestOSTypeConfigs = map[string]guestOSTypeConfig{
-	provisioner.UnixOSType: {
-		tempDir: "/tmp",
-		stagingDir: "/tmp/packer-puppet-server",
-		executeCommand: "cd {{.WorkingDir}} && " +
-			"{{.FacterVars}}" +
-			"{{if .Sudo}}sudo -E {{end}}" +
-			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
-			"puppet agent --onetime --no-daemonize --detailed-exitcodes {{.Options}} " +
-			"{{if .Debug}}--debug {{end}}" +
-			`{{if ne .PuppetServer ""}}--server='{{.PuppetServer}}' {{end}}` +
-			`{{if ne .PuppetNode ""}}--certname={{.PuppetNode}} {{end}}` +
-			`{{if ne .ClientCertPath ""}}--certdir='{{.ClientCertPath}}' {{end}}` +
-			`{{if ne .ClientPrivateKeyPath ""}}--privatekeydir='{{.ClientPrivateKeyPath}}' {{end}}`,
-		facterVarsFmt:    "FACTER_%s='%s'",
-		facterVarsJoiner: " ",
-	},
-	provisioner.WindowsOSType: {
-		tempDir: path.filepath.ToSlash(os.Getenv("TEMP")),
-		stagingDir: path.filepath.ToSlash(os.Getenv("SYSTEMROOT")) + "/Temp/packer-puppet-server",
-		executeCommand: "cd {{.WorkingDir}} && " +
-			"{{.FacterVars}} " +
-			`{{if ne .PuppetBinDir ""}}{{.PuppetBinDir}}/{{end}}` +
-			"puppet agent --onetime --no-daemonize --detailed-exitcodes {{.Options}} " +
-			"{{if .Debug}}--debug {{end}}" +
-			`{{if ne .PuppetServer ""}}--server='{{.PuppetServer}}' {{end}}` +
-			`{{if ne .PuppetNode ""}}--certname={{.PuppetNode}} {{end}}` +
-			`{{if ne .ClientCertPath ""}}--certdir='{{.ClientCertPath}}' {{end}}` +
-			`{{if ne .ClientPrivateKeyPath ""}}--privatekeydir='{{.ClientPrivateKeyPath}}' {{end}}`,
-		facterVarsFmt:    `SET "FACTER_%s=%s"`,
-		facterVarsJoiner: " & ",
-	},
-}
-
 type Provisioner struct {
 	config            Config
 	guestOSTypeConfig guestOSTypeConfig
@@ -191,7 +149,7 @@ func (p *Provisioner) Prepare(raws ...interface{}) error {
 		InterpolateFilter: &interpolate.RenderFilter{
 			Exclude: []string{
 				"execute_command",
-				"options",
+				"extra_arguments",
 			},
 		},
 	}, raws...)
@@ -302,7 +260,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	// Execute Puppet
-	p.config.ctx.Data = &ExecuteTemplate{
+	data = ExecuteTemplate{
 		ClientCertPath:       remoteClientCertPath,
 		ClientPrivateKeyPath: remoteClientPrivateKeyPath,
 		ExtraArguments:       "",
@@ -315,11 +273,11 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	p.config.ctx.Data = &data
-	_Options, err := interpolate.Render(strings.Join(p.config.Options, " "), &p.config.ctx)
+	_ExtraArguments, err := interpolate.Render(strings.Join(p.config.ExtraArguments, " "), &p.config.ctx)
 	if err != nil {
 		return err
 	}
-	data.Options = _Options
+	data.ExtraArguments = _ExtraArguments
 
 	command, err := interpolate.Render(p.config.ExecuteCommand, &p.config.ctx)
 	if err != nil {
