@@ -127,7 +127,6 @@ type ExecuteTemplate struct {
 	PuppetBinDir         string
 	Sudo                 bool
 	WorkingDir           string
-	Debug                bool
 }
 
 func (p *Provisioner) Prepare(raws ...interface{}) error {
@@ -248,7 +247,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	}
 
 	// Execute Puppet
-	data = ExecuteTemplate{
+	data := ExecuteTemplate{
 		ClientCertPath:       remoteClientCertPath,
 		ClientPrivateKeyPath: remoteClientPrivateKeyPath,
 		ExtraArguments:       "",
@@ -329,7 +328,7 @@ func (p *Provisioner) removeDir(ui packer.Ui, comm packer.Communicator, dir stri
 		Command: fmt.Sprintf("rm -fr '%s'", dir),
 	}
 
-	cmd := &packer.RemoteCmd{Command: p.guestCommands.CreateDir(dir)}
+	cmd = &packer.RemoteCmd{Command: p.guestCommands.CreateDir(dir)}
 	if err := cmd.StartWithUi(comm, ui); err != nil {
 		return err
 	}
