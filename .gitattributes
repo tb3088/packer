@@ -7,6 +7,8 @@
 *.pl    text eol=lf
 *.pm    text eol=lf
 
+*.go	text
+
 # Ruby, Chef
 *.rb    text
 
