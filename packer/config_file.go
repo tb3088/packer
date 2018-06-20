@@ -21,10 +21,11 @@ func ConfigDir() (string, error) {
 // ConfigTmpDir returns the configuration tmp directory for Packer
 func ConfigTmpDir() (string, error) {
 	var tmpdir, td string
-	var found bool
 	tmpdirenv := []string{"TEMP", "TMP", "LOCALAPPDATA"}
+	var err error
 
 	if tmpdir = os.Getenv("PACKER_TMP_DIR"); tmpdir == "" {
+		var found bool
 		for e := range tmpdirenv {
 			if tmpdir, found := os.LookupEnv(tmpdirenv[e]); found {
 				td = filepath.Join(tmpdir, "packer")

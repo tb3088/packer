@@ -92,6 +92,7 @@ fmt-check-loop:
 	fi
 
 fmt-docs:
+	@go get github.com/gogap/go-pandoc
 	@find ./website/source/docs -name "*.md" -exec pandoc --wrap auto --columns 79 --atx-headers -s -f "markdown_github+yaml_metadata_block" -t "markdown_github+yaml_metadata_block" {} -o {} \;
 
 # Install js-beautify with npm install -g js-beautify
@@ -101,11 +102,14 @@ fmt-examples:
 # generate runs `go generate` to build the dynamically generated
 # source files.
 generate: deps ## Generate dynamically generated code
-	go generate .
-	gofmt -w common/bootcommand/boot_command.go
-	goimports -w common/bootcommand/boot_command.go
-	gofmt -w command/plugin.go
+	@go get golang.org/x/tools/cmd/goimports
+	@go generate .
+	@gofmt -w common/bootcommand/boot_command.go
+	@goimports -w common/bootcommand/boot_command.go
+	@gofmt -w command/plugin.go
+	@touch $@
 
+.ONESHELL:
 test: deps fmt-check ## Run unit tests
 	@go test $(TEST) $(TESTARGS) -timeout=2m
 	@go tool vet $(VET)  ; if [ $$? -eq 1 ]; then \
@@ -127,4 +131,4 @@ updatedeps:
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
 
-.PHONY: bin checkversion ci default deps fmt fmt-docs fmt-examples generate releasebin test testacc testrace updatedeps
+.PHONY: bin checkversion ci default fmt-docs fmt-examples generate releasebin test testacc testrace updatedeps
