@@ -1,0 +1,3 @@
+https://github.com/hashicorp/packer/issues/2278#issuecomment-398590257
+
+Please fix so that Arrays are handled natively, or if that would be entirely too complicated, maybe as a back-door hack, leverage https://golang.org/src/encoding/json/decode.go which can suss out arrays from within strings
