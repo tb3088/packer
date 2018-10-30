@@ -12,7 +12,7 @@ GOFMT_FILES ?= $(shell find . -not -path './vendor/*' -name '*.go')
 GOFMT_START=1
 GOFMT_CHUNK=100
 
-EXECUTABLE_FILES=$(shell find . -type f -perm +111 | egrep -v '^\./(vendor/|\.git|bin/|scripts/|pkg/)' | egrep -v '.*(\.sh|\.bats)' | egrep -v './provisioner/ansible/test-fixtures/exit1')
+EXECUTABLE_FILES=$(shell find . -type f -executable | egrep -v '^\./(website/[vendor|tmp]|vendor/|\.git|bin/|scripts/|pkg/)' | egrep -v '.*(\.sh|\.bats|\.git)' | egrep -v './provisioner/ansible/test-fixtures/exit1')
 
 # Get the git commit
 GIT_DIRTY=$(shell test -n "`git status --porcelain`" && echo "+CHANGES" || true)
@@ -22,9 +22,11 @@ GOLDFLAGS=-X $(GIT_IMPORT).GitCommit=$(GIT_COMMIT)$(GIT_DIRTY)
 
 export GOLDFLAGS
 
-default: deps generate test dev
+.PHONY: bin checkversion ci default deps fmt fmt-docs fmt-examples generate releasebin test testacc testrace updatedeps
 
-ci: deps test
+default: deps generate testrace dev releasebin package dev fmt fmt-check mode-check fmt-docs fmt-examples 
+
+ci: testrace
 
 release: deps test releasebin package ## Build a release build
 
@@ -50,8 +52,6 @@ deps:
 	@go get golang.org/x/tools/cmd/stringer
 	@go get -u github.com/mna/pigeon
 	@go get github.com/kardianos/govendor
-	@go get golang.org/x/tools/cmd/goimports
-	@govendor sync
 
 dev: deps ## Build and install a development build
 	@grep 'const VersionPrerelease = ""' version/version.go > /dev/null ; if [ $$? -eq 0 ]; then \
@@ -125,21 +125,23 @@ generate: deps ## Generate dynamically generated code
 .ONESHELL:
 test: deps fmt-check mode-check ## Run unit tests
 	@go test $(TEST) $(TESTARGS) -timeout=2m
-	@go tool vet $(VET)  ; if [ $$? -eq 1 ]; then \
-		echo "ERROR: Vet found problems in the code."; \
-		exit 1; \
-	fi
 
 # testacc runs acceptance tests
 testacc: deps generate ## Run acceptance tests
 	@echo "WARN: Acceptance tests will take a long time to run and may cost money. Ctrl-C if you want to cancel."
 	PACKER_ACC=1 go test -v $(TEST) $(TESTARGS) -timeout=45m
 
-testrace: deps ## Test for race conditions
+testrace: fmt-check mode-check vet ## Test with race detection enabled
 	@go test -race $(TEST) $(TESTARGS) -timeout=2m
 
 updatedeps:
 	@echo "INFO: Packer deps are managed by govendor. See .github/CONTRIBUTING.md"
+
+vet: ## Vet Go code
+	@go tool vet $(VET)  ; if [ $$? -eq 1 ]; then \
+		echo "ERROR: Vet found problems in the code."; \
+		exit 1; \
+	fi
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'
