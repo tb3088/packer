@@ -12,23 +12,10 @@ import (
 	"strings"
 )
 
-func configFile() (string, error) {
-	dir, err := homeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, ".packerconfig"), nil
-}
-
-func configDir() (string, error) {
-	dir, err := homeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, ".packer.d"), nil
-}
+var	(
+	config_dir    = ".packer.d"
+	config_file   = "packer.conf"
+)
 
 func homeDir() (string, error) {
 	// First prefer the HOME environmental variable

@@ -11,27 +11,11 @@ import (
 var (
 	shell         = syscall.MustLoadDLL("Shell32.dll")
 	getFolderPath = shell.MustFindProc("SHGetFolderPathW")
+	config_dir    = "packer.d"
+	config_file   = "packer.config"
 )
 
 const CSIDL_APPDATA = 26
-
-func configFile() (string, error) {
-	dir, err := homeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, "packer.config"), nil
-}
-
-func configDir() (string, error) {
-	dir, err := homeDir()
-	if err != nil {
-		return "", err
-	}
-
-	return filepath.Join(dir, "packer.d"), nil
-}
 
 func homeDir() (string, error) {
 	b := make([]uint16, syscall.MAX_PATH)

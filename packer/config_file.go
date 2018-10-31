@@ -5,17 +5,26 @@ import (
 	"path/filepath"
 )
 
-// ConfigFile returns the default path to the configuration file. On
-// Unix-like systems this is the ".packerconfig" file in the home directory.
-// On Windows, this is the "packer.config" file in the application data
-// directory.
+// ConfigFile returns the default path to the configuration file (config).
+// On Unix-like systems it is rooted in the HOME directory while on Windows
+// the LOCALAPPDATA directory.
 func ConfigFile() (string, error) {
-	return configFile()
+	dir, err := homeDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, config_file), nil
 }
 
-// ConfigDir returns the configuration directory for Packer.
+// ConfigDir returns the configuration directory containing ConfigFile.
 func ConfigDir() (string, error) {
-	return configDir()
+	dir, err := homeDir()
+	if err != nil {
+		return "", err
+	}
+
+	return filepath.Join(dir, config_dir), nil
 }
 
 // ConfigTmpDir returns the configuration tmp directory for Packer
