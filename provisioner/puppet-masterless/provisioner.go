@@ -79,6 +79,8 @@ type guestOSTypeConfig struct {
 // FIXME assumes both Packer host and target are same OS
 var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 	provisioner.UnixOSType: {
+		// FIXME keying off of local /tmp is pointless! WorkingDir likewise
+		// rename WorkingDir to WorkingDirectory for cross-module consistency
 		tempDir:    "/tmp",
 		stagingDir: "/tmp/packer-puppet-masterless",
 		executeCommand: "cd {{.WorkingDir}} && " +
@@ -98,6 +100,7 @@ var guestOSTypeConfigs = map[string]guestOSTypeConfig{
 	},
 	provisioner.WindowsOSType: {
 		tempDir:    filepath.ToSlash(os.Getenv("TEMP")),
+		// FIXME keying off of local SYSTEMROOT is pointless!
 		stagingDir: filepath.ToSlash(os.Getenv("SYSTEMROOT")) + "/Temp/packer-puppet-masterless",
 		executeCommand: "cd {{.WorkingDir}} && " +
 			`{{if ne .FacterVars ""}}{{.FacterVars}} && {{end}}` +

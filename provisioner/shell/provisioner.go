@@ -216,9 +216,9 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 	// If we have an inline script, then turn that into a temporary
 	// shell script and use that.
 	if p.config.Inline != nil {
-		tf, err := ioutil.TempFile("", "packer-shell")
+		tf, err := packer.TempFile("packer-shell")
 		if err != nil {
-			return fmt.Errorf("Error preparing shell script: %s", err)
+			return fmt.Errorf("preparing shell script: %s", err)
 		}
 		defer os.Remove(tf.Name())
 
@@ -230,32 +230,32 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 		writer.WriteString(fmt.Sprintf("#!%s\n", p.config.InlineShebang))
 		for _, command := range p.config.Inline {
 			if _, err := writer.WriteString(command + "\n"); err != nil {
-				return fmt.Errorf("Error preparing shell script: %s", err)
+				return fmt.Errorf("preparing shell script: %s", err)
 			}
 		}
 
 		if err := writer.Flush(); err != nil {
-			return fmt.Errorf("Error preparing shell script: %s", err)
+			return fmt.Errorf("preparing shell script: %s", err)
 		}
 
 		tf.Close()
 	}
 
 	if p.config.UseEnvVarFile == true {
-		tf, err := ioutil.TempFile("", "packer-shell-vars")
+		tf, err := packer.TempFile("packer-shell-vars")
 		if err != nil {
-			return fmt.Errorf("Error preparing shell script: %s", err)
+			return fmt.Errorf("preparing shell script: %s", err)
 		}
 		defer os.Remove(tf.Name())
 
 		// Write our contents to it
 		writer := bufio.NewWriter(tf)
 		if _, err := writer.WriteString(p.createEnvVarFileContent()); err != nil {
-			return fmt.Errorf("Error preparing shell script: %s", err)
+			return fmt.Errorf("preparing shell script: %s", err)
 		}
 
 		if err := writer.Flush(); err != nil {
-			return fmt.Errorf("Error preparing shell script: %s", err)
+			return fmt.Errorf("preparing shell script: %s", err)
 		}
 
 		p.config.envVarFile = tf.Name()
@@ -275,7 +275,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 			remoteVFName := fmt.Sprintf("%s/%s", p.config.RemoteFolder,
 				fmt.Sprintf("varfile_%d.sh", rand.Intn(9999)))
 			if err := comm.Upload(remoteVFName, r, nil); err != nil {
-				return fmt.Errorf("Error uploading envVarFile: %s", err)
+				return fmt.Errorf("uploading envVarFile: %s", err)
 			}
 			tf.Close()
 
@@ -284,8 +284,7 @@ func (p *Provisioner) Provision(ui packer.Ui, comm packer.Communicator) error {
 			}
 			if err := comm.Start(cmd); err != nil {
 				return fmt.Errorf(
-					"Error chmodding script file to 0600 in remote "+
-						"machine: %s", err)
+					"chmod script to 0600 on remote machine: %s", err)
 			}
 			cmd.Wait()
 			p.config.envVarFile = remoteVFName

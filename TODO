@@ -1,0 +1,135 @@
+packer can't handle '~' in ssh_private_key_file parameter. It needs to run an expand-path() on it.
+
+BUG! packer deletes the log file ($script.out) for packer jobs. ie from generated scripts.
+This should test for $result is bad then Write-Error (without exiting!) or Write-Warn the contents.
+packer-elevated-shell-UUID.ps1
+if (Test-Path $log) {
+    Remove-Item $log -Force -ErrorAction SilentlyContinue | Out-Null
+}
+The generated XML for the scheduled job-spec doesn't expand %SYSTEMROOT% which is odd given the rest of the XML makes explicit reference to C:/Windows/Temp for the ENV and command scripts.
+Where (!!) is the value for %SYSTEMROOT% being expanded or is it hard-coded in Go?
+
+also this is stupid inefficient, just use $env:SystemRoot. 
+$log = [System.Environment]::ExpandEnvironmentVariables("%SYSTEMROOT%/Temp/packer-5c464ae4-cfbc-4b6d-57af-908fd023e38c.out")
+
+
+Packer when connecting to a Windows host needs to probe value of %SYSTEMROOT% before starting Provisioners and alter generated code accordingly. It !MUST NOT! assume C:/Windows/Temp etc.
+
+
+SERIOUS BUG!?
+The generated scripts appear to invoke the last 'script' in a 'scripts[]' N-times instead of each one. Or
+Packer is overwriting the single generated script-name with the contents of each script in turn. WTF?! 
+
+
+BUG! Packer can't handle quotes on RHS of '=' in -var-file=...
+therefore NO spaces in path name allowed!
+
+
+BUG! https://www.packer.io/docs/provisioners/powershell.html
+The *obvious* solution is for the provisioner to check if using SSH and to modify the 'execute_command' automatically.
+
+
+check that TMPDIR is properly updated. github.com/hashicorp/packer/pull/4459/files
+
+
+fix https://www.packer.io/docs/provisioners/ansible.html to point out 'ansible_winrm_*' is deprecated as of v2. also passwing .WinRMPassword is done as setting 'ansible_password'
+
+Fix powershell etc. 'scripts' style to handle Arguments to each script
+
+FIX powershell 'execute_command' to include '-NonInteractive'. optionally '-WindowStyle Normal' during step-by debug mode.
+  instead of using '. {{.Vars}}' use '-File {{.Vars}}'
+  also unless DEBUG set $global:ConfirmPreference = 'none'; $global:ErrorActionPreference = 'SilentlyContinue'
+
+FIX powershell 'execute_commmand' to capture stdout and stderr in a way that displays back to provisioner. Wrap main {& ...}
+in start-transcript -path step1.out and sotp-transcript? What is causing output not do be passed back?
+https://blogs.msdn.microsoft.com/powershell/2014/04/16/collecting-the-output-of-remoting-commands/
+
+
+The problem of 'Variables' section having to be Strings is probably rooted in typecasting
+(see https://blog.golang.org/constants for simple discussion) which then needs to individually
+reparsed by template.parse() or look for 'magic' indicators they might be Array or Integers etc.
+The problem is that JSON datatypes are getting lost.
+
+
+expose TempDir() to privisioners in form of {{.TempDir}}, some Provisioners use WorkingDir(ectory)
+consider TempDir and RemoteTempDir
+
+is there a way to probe the Remote and re-evaluate .RemoteTempDir? should fire after step 'StepConnect'
+and Pausing before the next provisioner '.'
+Basically it should be a 'hidden' provisioner step.
+
+
+also see ./provisioner/converge/provisioner.go
+
+
+Why does Puppet provisioner have StagingDir? strip 'packer' from directory name
+
+
+packer 'validate' should not throw error on -debug, it should do something useful with it!
+
+replace Json file inputs with Yaml processor: https://github.com/go-yaml/yaml
+also look at using Unmarshall ala https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+https://tutorialedge.net/golang/parsing-json-with-golang/#full-implementation
+
+maybe also consider https://github.com/pelletier/go-toml or better yet https://github.com/spf13/viper
+
+
+rename builder/amazon-*' clean_ami_name to clean_image_name like all the other builders use and synonym 
+for backwards compat. fix documentation https://www.packer.io/docs/templates/engine.html and reference
+clean_ami_name in paragraphs describing ami_name(string) in 
+  https://www.packer.io/docs/builders/amazon-chroot.html
+  https://www.packer.io/docs/builders/amazon-instance.html
+Also merge common areas of the Amazon pages if possible.
+
+
+WOW! amazon_ebs builder (any?) does NOT process ami_name for embedded template if there are any IF statements. Needs
+Lazy evaluation like I did for Puppet.
+
+Furthermore when it "prevalidates" the name it's not checking for existance but probably just name syntax. Does
+it run it thru clean_ami_name and compare pre- vs post-? If it's doing that then why not do it transparently
+for user instead and warn/error appropriately?
+
+
+Ansible Provision doesn't honor {{if }} in "extra_arguments"? probably needs 'lazy' evaluation like done for Puppet.
+rename 'ansible_env_vars' to 'environment_vars' just like shell (and Puppet?) do.
+
+
+REGRESSIOn? 1.3.4 no longer accepts '0' for disk size to imply use whatever the AMI/Snapshot is sized to.
+Likely this is a dumb-ass regression at the upstream golang API - actually seems to have to do with
+/dev/sda1 being required for boot volume for RHEL but xvdb-z used for all other disks and 'a' fine for
+other Linux flavors. Windows appears to use /dev/sda-f style but need to verify.
+
+
+write paragraph about {{if ...}} on page https://www.packer.io/docs/templates/engine.html
+point "templating engine" reference page to ALSO the whole golang Template package docs
+and maybe even point to http://goinbigdata.com/example-of-using-templates-in-golang/ as a tutorial.
+bonus: https://siongui.github.io/2015/02/21/python-jinja2-vs-go-html-template-1/
+
+NOTE single-quotes do NOT work since perceived as string constant. Note that 'Template Variables' have 
+no direct comparison to keyword in the actual template!! You have to look at the source code to see how
+keywords get mapped to the Variable names. eg. module_paths -> .ModulePath, puppet_bin_dir -> .PuppetBinDir
+
+see also struct to json key mapping example: https://www.sohamkamani.com/blog/2017/10/18/parsing-json-in-golang/
+
+ "{{if ne \"{{user `environment`}}\" \"\"}}--environment={{user `environment`}}{{end}}",
+                "{{if eq \"{{user `debug`}}\" \"1\"}}--test{{end}}",
+                "{{if gt \"{{user `debug`}}\" \"1\"}}--debug{{end}}",
+                "{{if user `noop`}}--noop{{end}}",
+                "{{if ne \".ModulePath\" \"\"}}--modulepath='{{.ModulePath}}:$({{.PuppetBinDir}}/puppet config print {{if ne \"{{user `environment`}}\" \"\"}}--environment={{user `environment`}}{{end}} modulepath)'{{end}}"
+
+
+ansible-remote provisioner builds a command-line htat is all mis-ordered. the playbook comes LAST!
+
+
+"wget -outfile '{{split {{user `gitbash.url`}} '/' -1}}' '{{user `gitbash.url`}}'",
+above won't work sadly. https://golang.org/pkg/text/template/ look for Nested", The entire GoLang template
+structure needs to be supported.
+
+
+split() needs to take '-#' to count from back ala Array indexing, not length.
+split() needs to take '|' as string input otherwise have to resort to shananigans like Nested Templates (above)
+
+
+What's the problem with single quotes in GoLang templates? and distinction between string contant and a 'raw' constant?
+
+https://github.com/hashicorp/packer/issues/4134

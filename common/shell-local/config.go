@@ -195,6 +195,7 @@ func Validate(config *Config) error {
 		}
 		// Interoperability issues with WSL makes creating and running tempfiles
 		// via golang's os package basically impossible.
+// FIXME still true?
 		if len(config.Inline) > 0 {
 			errs = packer.MultiErrorAppend(errs,
 				fmt.Errorf("Packer is unable to use the Command and Inline "+
